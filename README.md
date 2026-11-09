@@ -1,6 +1,6 @@
 # Estampamos Medellín
 
-Tienda mobile-first de estampados, construida con React, Vite y Tailwind CSS. Incluye catálogo filtrable, carrito de cotización por WhatsApp y selector persistente de tema oscuro/claro.
+Tienda mobile-first construida con React, Vite, Tailwind CSS y GSAP/ScrollTrigger. El hero cuenta “Los mejores estampados de Medellín” mientras se desplaza el usuario y termina en una invitación a cotizar. El copy celebra el orgullo de Medellín y de Colombia; los acentos de la bandera acompañan el vinotinto de marca. Incluye catálogo filtrable, carrito de cotización por WhatsApp y selector persistente de tema oscuro/claro.
 
 ## Desarrollo local
 

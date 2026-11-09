@@ -1,5 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowDownRight, ArrowRight, Check, Menu, MessageCircle, Minus, Moon, Plus, ShoppingBag, Sun, X } from 'lucide-react'
+
+gsap.registerPlugin(useGSAP, ScrollTrigger)
 
 const products = [
   { id: 'hd-2026', category: 'Camisetas', name: 'Camiseta HD 2026', detail: 'Camiseta blanca · gráfico rojo', description: 'Primer plano de una camiseta blanca con gráfico rojo Harley-Davidson.', image: '/images/camiseta-hd-2026.jpg', imagePosition: 'center 58%', code: 'EM-01' },
@@ -22,6 +27,8 @@ function readStorage(key, fallback) {
 }
 
 function App() {
+  const storefrontRef = useRef(null)
+  const heroRef = useRef(null)
   const [theme, setTheme] = useState(() => readStorage('estampamos-theme', 'dark'))
   const [cart, setCart] = useState(() => {
     try { return JSON.parse(readStorage('estampamos-cart', '[]')) } catch { return [] }
@@ -31,6 +38,73 @@ function App() {
   const [activeCategory, setActiveCategory] = useState('Todos')
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0)
   const visibleProducts = products.filter((product) => activeCategory === 'Todos' || product.category === activeCategory)
+
+  useGSAP(() => {
+    const hero = heroRef.current
+    if (!hero) return
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const words = gsap.utils.toArray('.hero-word', hero)
+    const images = gsap.utils.toArray('.hero-frame', hero)
+    const quote = hero.querySelector('.hero-end-cta')
+
+    if (reducedMotion) {
+      gsap.set(words, { clearProps: 'all' })
+      gsap.set(images.slice(1), { autoAlpha: 0 })
+      gsap.set(quote, { autoAlpha: 1, y: 0 })
+      return
+    }
+
+    gsap.set(words.slice(1), { autoAlpha: 0, y: 38 })
+    gsap.set(images.slice(1), { autoAlpha: 0, scale: 1.035 })
+    gsap.set(quote, { autoAlpha: 0, y: 22 })
+
+    const sequence = gsap.timeline({
+      scrollTrigger: {
+        trigger: hero,
+        start: 'top top',
+        end: () => `+=${Math.round(window.innerHeight * 2.45)}`,
+        pin: true,
+        pinSpacing: true,
+        scrub: 0.7,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+      },
+    })
+
+    sequence
+      .to(words[0], { autoAlpha: 0, y: -30, duration: 0.75, ease: 'power2.inOut' })
+      .to(images[0], { autoAlpha: 0, duration: 0.75 }, '<')
+      .to(words[1], { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power3.out' }, '<0.15')
+      .to(images[1], { autoAlpha: 1, scale: 1, duration: 0.9, ease: 'power2.out' }, '<')
+      .to(words[1], { autoAlpha: 0, y: -30, duration: 0.75, ease: 'power2.inOut' })
+      .to(images[1], { autoAlpha: 0, duration: 0.75 }, '<')
+      .to(words[2], { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power3.out' }, '<0.15')
+      .to(images[2], { autoAlpha: 1, scale: 1, duration: 0.9, ease: 'power2.out' }, '<')
+      .to(quote, { autoAlpha: 1, y: 0, duration: 0.8, ease: 'power2.out' }, '+=0.12')
+  }, { scope: heroRef, dependencies: [] })
+
+  useGSAP(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    gsap.utils.toArray('[data-scroll-reveal]').forEach((element) => {
+      gsap.from(element, {
+        y: 28,
+        autoAlpha: 0,
+        duration: 0.8,
+        ease: 'power2.out',
+        scrollTrigger: { trigger: element, start: 'top 88%', once: true },
+      })
+    })
+    gsap.from('.product-card', {
+      y: 24,
+      autoAlpha: 0,
+      duration: 0.65,
+      stagger: 0.09,
+      ease: 'power2.out',
+      scrollTrigger: { trigger: '.product-grid', start: 'top 86%', once: true },
+    })
+  }, { scope: storefrontRef, dependencies: [] })
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -69,7 +143,7 @@ function App() {
 
   function sendCart() {
     const items = cart.map((item) => `• ${item.name}: ${item.quantity} prenda(s)`).join('\n')
-    const message = `Hola, quiero cotizar estas prendas:\n${items}\n\nPor favor compártanme precio, tallas disponibles y tiempos.`
+    const message = `Hola, equipo de Estampamos Medellín. Quiero cotizar estas prendas de su colección:\n${items}\n\n¿Me comparten precios, tallas disponibles y tiempos?`
     window.open(quoteLink(message), '_blank', 'noopener,noreferrer')
   }
 
@@ -78,12 +152,13 @@ function App() {
     const data = new FormData(event.currentTarget)
     const name = data.get('name') || 'Hola'
     const details = data.get('details') || 'Quiero personalizar unas prendas.'
-    window.open(quoteLink(`${name}, quiero cotizar estampados personalizados. ${details}`), '_blank', 'noopener,noreferrer')
+    window.open(quoteLink(`Hola, equipo de Estampamos Medellín. Soy ${name} y quiero cotizar un estampado con identidad. ${details}`), '_blank', 'noopener,noreferrer')
   }
 
   return (
-    <div className="storefront" id="inicio">
-      <div className="announcement"><span>ESTAMPADOS CON IDENTIDAD · MEDELLÍN, COLOMBIA</span><a href="#estampados">Descubre la colección <ArrowRight size={13} /></a></div>
+    <div className="storefront" id="inicio" ref={storefrontRef}>
+      <div className="announcement"><span>MEDELLÍN, COLOMBIA · ORGULLO QUE SE LLEVA PUESTO</span><a href="#estampados">Conoce nuestros estampados <ArrowRight size={13} /></a></div>
+      <div className="colombia-ribbon" aria-hidden="true"><span /><span /><span /></div>
       <header className="store-header">
         <a className="store-brand" href="#inicio" aria-label="Estampamos Medellín, inicio"><img src="/images/logo.jpg" alt="" /><span>ESTAMPAMOS<small>MEDELLÍN · COLOMBIA</small></span></a>
         <nav className={menuOpen ? 'store-nav is-open' : 'store-nav'} aria-label="Navegación principal">
@@ -97,32 +172,40 @@ function App() {
       </header>
 
       <main>
-        <section className="hero section-wrap">
-          <div className="hero-copy">
-            <p className="eyebrow"><span /> DTF · SUBLIMACIÓN · BORDADO</p>
-            <h1>Estampados<br />que hablan <em>por ti.</em></h1>
-            <p className="hero-description">Diseños para llevar puestos. Prendas personalizadas, hechas con carácter en Medellín.</p>
-            <div className="hero-ctas"><a className="primary-button" href="#estampados">Ver estampados <ArrowRight size={17} /></a><a className="quiet-link" href="#personaliza">Crea el tuyo <ArrowDownRight size={16} /></a></div>
-            <div className="hero-caption"><span className="caption-index">01</span><span>DISEÑO REAL · PRENDA REAL</span><span className="caption-rule" /></div>
+        <section className="scroll-hero" id="inicio-hero" ref={heroRef}>
+          <div className="hero-visual-stack" aria-hidden="true">
+            <img className="hero-frame" src="/images/camiseta-hd-2026.jpg" alt="" fetchPriority="high" />
+            <img className="hero-frame" src="/images/buso-racing.jpg" alt="" />
+            <img className="hero-frame" src="/images/camiseta-palo-rosa.jpg" alt="" />
           </div>
-          <div className="hero-stage">
-            <img src="/images/camiseta-hd-2026.jpg" alt="Detalle del gráfico rojo estampado en una camiseta blanca" fetchPriority="high" />
-            <div className="stage-gradient" /><div className="stage-edition"><span>ESTAMPADO</span><b>01 / 06</b></div>
-            <div className="press-loader" aria-label="Animación de entrada inspirada en una prensa de estampado"><div><span className="press-dot" /> PREPARANDO LA PRENSA <b>LISTO</b></div><span className="press-track"><i /></span></div>
-            <span className="stage-mark" aria-hidden="true">EM</span>
+          <div className="hero-vignette" />
+          <div className="hero-glass-label glass-panel"><span className="colombia-flag-mark" aria-hidden="true"><i /><i /><i /></span> HECHO CON ORGULLO EN MEDELLÍN</div>
+          <div className="hero-centerpiece">
+            <p className="hero-overline"><span className="colombia-flag-mark" aria-hidden="true"><i /><i /><i /></span> ESTAMPAMOS MEDELLÍN · COLOMBIA</p>
+            <h1 className="hero-sequence-title" aria-label="Los mejores estampados de Medellín">
+              <span className="hero-word">Los mejores</span>
+              <span className="hero-word">estampados</span>
+              <span className="hero-word">de Medellín</span>
+            </h1>
+            <p className="hero-scroll-hint"><span /> DESLIZA Y DESCUBRE LO NUESTRO <ArrowDownRight size={15} /></p>
           </div>
-          <span className="hero-vertical-note">HECHO PARA EXPRESARTE — 2026</span>
+          <div className="hero-frame-counter glass-panel"><span>COLECCIÓN</span><b>01 <i>/</i> 03</b></div>
+          <div className="hero-end-cta glass-panel">
+            <span className="hero-cta-kicker">ORGULLO QUE SE LLEVA PUESTO</span>
+            <p>Tu idea merece salir a la calle.</p>
+            <a className="primary-button" href="#cotizar">Cotiza tu estampado <ArrowRight size={16} /></a>
+          </div>
         </section>
 
-        <section className="signal-bar" aria-label="Servicios de Estampamos Medellín"><div><span className="signal-icon"><Check size={16} /></span> Diseño personalizado</div><div><span className="signal-icon"><Check size={16} /></span> Calidad y cumplimiento</div><div><span className="signal-icon"><Check size={16} /></span> Medellín · Colombia</div></section>
+        <section className="signal-bar" aria-label="Servicios de Estampamos Medellín" data-scroll-reveal><div><span className="signal-icon"><Check size={16} /></span> Diseños con identidad</div><div><span className="signal-icon"><Check size={16} /></span> Estampamos en Medellín</div><div><span className="signal-icon"><Check size={16} /></span> Orgullo colombiano</div></section>
 
-        <section className="collection section-wrap" id="estampados">
-          <div className="collection-heading"><div><p className="eyebrow"><span /> LA COLECCIÓN</p><h2>Estampados <em>para llevar.</em></h2></div><p className="collection-intro">Referencias de prendas y gráficos que ya salieron del taller. Elige una para cotizarla o úsala de punto de partida.</p></div>
+        <section className="collection section-wrap" id="estampados" data-scroll-reveal>
+          <div className="collection-heading"><div><p className="eyebrow"><span /> HECHOS PARA LLEVAR CON ORGULLO</p><h2>Estampados que<br /><em>llevan nuestra identidad.</em></h2></div><p className="collection-intro">Gráficas de nuestra colección sobre prendas reales. Escoge una para cotizar o cuéntanos qué te gustaría llevar puesto.</p></div>
           <div className="collection-toolbar">
             <div className="collection-filters" role="group" aria-label="Filtrar estampados por tipo de prenda">
               {categories.map((category) => <button key={category} type="button" className={activeCategory === category ? 'collection-filter is-active' : 'collection-filter'} aria-pressed={activeCategory === category} onClick={() => setActiveCategory(category)}>{category}</button>)}
             </div>
-            <div className="collection-meta"><span>PRENDAS PERSONALIZADAS</span><span>{String(visibleProducts.length).padStart(2, '0')} REFERENCIAS</span></div>
+            <div className="collection-meta"><span>ESTAMPADOS DE LA CASA</span><span>{String(visibleProducts.length).padStart(2, '0')} REFERENCIAS</span></div>
           </div>
           <div className="product-grid">
             {visibleProducts.map((product, index) => (
@@ -135,14 +218,14 @@ function App() {
           </div>
         </section>
 
-        <section className="custom-banner" id="personaliza"><div className="custom-inner section-wrap"><div className="custom-image"><img src="/images/camiseta-palo-rosa.jpg" alt="Detalle de camiseta palo de rosa con estampado rojo" loading="lazy" /><span>COLOR · GRÁFICA · PRENDA</span></div><div className="custom-copy"><p className="eyebrow"><span /> TU IDEA, TU ESTAMPADO</p><h2>No tiene que estar<br />en el catálogo.</h2><p>Un diseño propio, una camiseta favorita o una idea a medio hacer. Hablemos de qué quieres estampar y en qué prenda.</p><a className="outline-button" href="#cotizar">Cuéntanos tu idea <ArrowRight size={16} /></a></div></div></section>
+        <section className="custom-banner" id="personaliza" data-scroll-reveal><div className="custom-inner section-wrap"><div className="custom-image"><img src="/images/camiseta-palo-rosa.jpg" alt="Detalle de camiseta palo de rosa con estampado rojo" loading="lazy" /><span>COLOR · GRÁFICA · IDENTIDAD</span></div><div className="custom-copy"><p className="eyebrow"><span /> UNA IDEA TUYA, UNA PRENDA CON CARÁCTER</p><h2>Lo que nos representa,<br />también se lleva puesto.</h2><p>¿Tienes un diseño propio, una frase que te mueve o una idea por aterrizar? La convertimos en una cotización hecha a tu medida.</p><a className="outline-button" href="#cotizar">Dale forma a tu idea <ArrowRight size={16} /></a></div></div></section>
 
-        <section className="business section-wrap" id="empresas"><div className="business-content"><p className="eyebrow"><span /> PARA PERSONAS Y EMPRESAS</p><h2>Una prenda<br />también <em>representa.</em></h2><p>En el archivo hay ejemplos de camisetas estampadas y publicaciones de dotaciones empresariales. Cuéntanos qué necesita tu equipo y cotizamos el proyecto.</p><div className="business-tags"><span>DTF</span><span>Sublimación</span><span>Bordado</span><span>Uniformes</span></div><a className="primary-button" href={quoteLink('Hola, quiero cotizar estampados y dotaciones para mi empresa.')} target="_blank" rel="noreferrer">Cotizar para mi empresa <ArrowRight size={17} /></a></div><figure className="business-photo"><img src="/images/dotaciones.jpg" alt="Detalle de estampado tipográfico en una camiseta clara, fotografía publicada junto a servicios empresariales" loading="lazy" /><figcaption><span>TRABAJO PUBLICADO</span><span>MEDELLÍN · COLOMBIA</span></figcaption></figure></section>
+        <section className="business section-wrap" id="empresas" data-scroll-reveal><div className="business-content"><p className="eyebrow"><span /> PARA EMPRESAS CON IDENTIDAD</p><h2>Un equipo unido<br /><em>también se hace notar.</em></h2><p>Dotaciones, uniformes y estampados para que tu equipo se reconozca en cada jornada. Cuéntanos qué necesitas y armamos una cotización para tu empresa.</p><div className="business-tags"><span>DTF</span><span>Sublimación</span><span>Bordado</span><span>Uniformes</span></div><a className="primary-button" href={quoteLink('Hola, equipo de Estampamos Medellín. Quiero cotizar estampados y dotaciones para mi empresa en Colombia.')} target="_blank" rel="noreferrer">Cotizar para mi empresa <ArrowRight size={17} /></a></div><figure className="business-photo"><img src="/images/dotaciones.jpg" alt="Detalle de estampado tipográfico en una camiseta clara, fotografía publicada junto a servicios empresariales" loading="lazy" /><figcaption><span>ESTILO HECHO EN MEDELLÍN</span><span>ORGULLO COLOMBIANO</span></figcaption></figure></section>
 
-        <section className="custom-quote" id="cotizar"><div className="custom-quote-inner section-wrap"><div><p className="eyebrow"><span /> COTIZACIÓN DIRECTA</p><h2>¿Qué quieres<br />estampar?</h2><p>Cuéntanos lo esencial. El equipo continúa la conversación contigo por WhatsApp.</p></div><form className="quote-form" onSubmit={submitCustomQuote}><label htmlFor="quote-name">Tu nombre</label><input id="quote-name" name="name" type="text" placeholder="¿Cómo te llamas?" autoComplete="name" /><label htmlFor="quote-details">Tu idea</label><textarea id="quote-details" name="details" rows="3" placeholder="Prenda, diseño y cantidad aproximada…" /><button className="primary-button" type="submit">Cotizar por WhatsApp <MessageCircle size={17} /></button></form></div></section>
+        <section className="custom-quote" id="cotizar"><div className="custom-quote-inner section-wrap"><div><p className="eyebrow"><span /> HECHO AQUÍ · COTIZADO CONTIGO</p><h2>¿Qué quieres<br />llevar puesto?</h2><p>Cuéntanos tu idea y la cantidad aproximada. Te respondemos por WhatsApp para definir juntos los detalles.</p></div><form className="quote-form" onSubmit={submitCustomQuote}><label htmlFor="quote-name">¿Cómo te llamas?</label><input id="quote-name" name="name" type="text" placeholder="Tu nombre" autoComplete="name" /><label htmlFor="quote-details">¿Qué quieres estampar?</label><textarea id="quote-details" name="details" rows="3" placeholder="Prenda, diseño y cantidad aproximada…" /><button className="primary-button" type="submit">Cotizar por WhatsApp <MessageCircle size={17} /></button></form></div></section>
       </main>
 
-      <footer className="store-footer"><a className="store-brand" href="#inicio"><img src="/images/logo.jpg" alt="" /><span>ESTAMPAMOS<small>MEDELLÍN · COLOMBIA</small></span></a><p>Estampados DTF · Sublimación · Bordados</p><a href={quoteLink('Hola, quiero información sobre los estampados de Estampamos Medellín.')} target="_blank" rel="noreferrer">Hablemos <ArrowRight size={15} /></a></footer>
+      <footer className="store-footer"><a className="store-brand" href="#inicio"><img src="/images/logo.jpg" alt="" /><span>ESTAMPAMOS<small>MEDELLÍN · COLOMBIA</small></span></a><p>Estampados con identidad colombiana · DTF · Sublimación · Bordados</p><a href={quoteLink('Hola, Estampamos Medellín. Quiero conocer sus estampados con identidad colombiana.')} target="_blank" rel="noreferrer">Hablemos <ArrowRight size={15} /></a></footer>
 
       {cartCount > 0 && !cartOpen && <button className="mobile-cart-bar" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={18} /><span>Ver cotización</span><b>{cartCount} {cartCount === 1 ? 'prenda' : 'prendas'}</b><ArrowRight size={17} /></button>}
       {cartOpen && <div className="cart-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}><section className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cart-title"><div className="cart-head"><div><p className="eyebrow"><span /> TU SELECCIÓN</p><h2 id="cart-title">Mi cotización <small>({cartCount})</small></h2></div><button className="icon-button" type="button" onClick={() => setCartOpen(false)} aria-label="Cerrar cotización"><X size={20} /></button></div>
